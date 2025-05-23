@@ -5,8 +5,10 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated  
 from rest_framework_simplejwt.authentication import JWTAuthentication 
 from .models import Event, EventParticipant
+from events.models import HistoricalEvent 
 from django.utils.dateparse import parse_datetime
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger #i always use djangos own paginator
+from django.shortcuts import get_object_or_404
 
 # Create your views here.
 
@@ -332,3 +334,157 @@ class EventViewShare(APIView):
             return Response({"message": "User removed from the event."}, status=status.HTTP_200_OK)
         except EventParticipant.DoesNotExist:
             return Response({"error": "User not found in the event."}, status=status.HTTP_404_NOT_FOUND)
+
+class EventHistoryListView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get(self, request, id):
+        event = get_object_or_404(Event, id=id)
+        print("Ateeb is chkin event history")
+        data = []
+
+        # Ensure user has access
+        if not event.participants.filter(id=request.user.id).exists():
+            return Response({"error": "Not authorized to view this event's history"}, status=status.HTTP_403_FORBIDDEN)
+
+        history_versions = event.history.all().order_by("-history_date")
+        for version in history_versions:
+            data.append({
+                "version_id": version.history_id,
+                "event_id": version.id,
+                "history_type": version.history_type,  # +, ~, -
+                "history_date": version.history_date.strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+        return Response(data, status=status.HTTP_200_OK)
+
+class EventHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get(self, request, id, version_id):
+        print("version id", version_id)
+        event = get_object_or_404(Event, id=id)
+        
+        # Check if user has permission to view event history
+        if not event.participants.filter(id=request.user.id).exists():
+            return Response({"error": "Not authorized to view this event's history"}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            version = HistoricalEvent.objects.get(id=id, history_id=version_id)        
+        except HistoricalEvent.DoesNotExist:
+            return Response({"error": "Version not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        data = {
+            "id": version.id,
+            "title": version.title,
+            "description": version.description,
+            "start_time": version.start_time,
+            "end_time": version.end_time,
+            "location": version.location,
+            "is_recurring": version.is_recurring,
+            "recurrence_pattern": version.recurrence_pattern,
+            "history_date": version.history_date,
+            "history_type": version.history_type,  # creatye/updatee\/delete
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class EventRollbackView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def post(self, request, id, version_id):
+        event = get_object_or_404(Event, id=id)
+        
+        # Only owners can rollback
+        if not event.eventparticipant_set.filter(user=request.user, role='OWNER').exists():
+            return Response({"error": "Only owner can rollback event"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            version = HistoricalEvent.objects.get(id=id, history_id=version_id)        
+        except HistoricalEvent.DoesNotExist:
+            return Response({"error": "Version not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Rollback event fields
+        event.title = version.title
+        event.description = version.description
+        event.start_time = version.start_time
+        event.end_time = version.end_time
+        event.location = version.location
+        event.is_recurring = version.is_recurring
+        event.recurrence_pattern = version.recurrence_pattern
+        event.save()
+
+        return Response({"message": "Event rolled back successfully"}, status=status.HTTP_200_OK)
+
+class EventChangelogView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get(self, request, id):
+        event = get_object_or_404(Event, id=id)
+
+        if not event.participants.filter(id=request.user.id).exists():
+            return Response({"error": "Not authorized"}, status=403)
+
+        history = list(event.history.all().order_by('history_date'))  # Ascending
+
+        changelog = []
+
+        for i, entry in enumerate(history):
+            changed_fields = {}
+
+            if i > 0:
+                prev = history[i - 1]
+                for field in ['title', 'description', 'start_time', 'end_time', 'location', 'is_recurring', 'recurrence_pattern']:
+                    old = getattr(prev, field)
+                    new = getattr(entry, field)
+                    if old != new:
+                        changed_fields[field] = {
+                            "from": old,
+                            "to": new
+                        }
+
+            changelog.append({
+                "history_id": entry.history_id,
+                "history_date": entry.history_date,
+                "history_type": entry.history_type,
+                "changed_by": entry.history_user_id,
+                "change_reason": entry.history_change_reason,
+                "changed_fields": changed_fields,
+            })
+
+        return Response(changelog, status=200)
+    
+class EventDiffView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id, version_id1, version_id2):
+        event = get_object_or_404(Event, id=id)
+
+        if not event.participants.filter(id=request.user.id).exists():
+            return Response({"error": "Not authorized"}, status=403)
+
+        try:
+            v1 = HistoricalEvent.objects.get(id=id, history_id=version_id1)
+            v2 = HistoricalEvent.objects.get(id=id, history_id=version_id2)
+        except HistoricalEvent.DoesNotExist:
+            return Response({"error": "One or both versions not found"}, status=404)
+
+        diff = {}
+        fields = ['title', 'description', 'start_time', 'end_time', 'location', 'is_recurring', 'recurrence_pattern']
+
+        for field in fields:
+            val1 = getattr(v1, field)
+            val2 = getattr(v2, field)
+            if val1 != val2:
+                diff[field] = {
+                    "version_1": val1,
+                    "version_2": val2
+                }
+
+        return Response(diff, status=200)
+    

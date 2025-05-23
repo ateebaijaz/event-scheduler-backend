@@ -43,6 +43,7 @@ class LoginView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class LogoutView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         try:
             refresh_token = request.data["refresh"]

@@ -35,6 +35,7 @@ schema_view = get_schema_view(
    ),
    public=True,
    permission_classes=(permissions.AllowAny,),
+   url='https://event-scheduler-backend-production.up.railway.app',  # force https here
 )
 urlpatterns = [
     path('', home),

@@ -91,7 +91,8 @@ class EventView(APIView):
                 },
             }, status=status.HTTP_201_CREATED)
         except Exception as e:
-            return Response({"Error in creating event"-str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": f"Error in creating event - {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
     
 
     @swagger_auto_schema(

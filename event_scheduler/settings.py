@@ -99,6 +99,9 @@ CORS_ALLOWED_ORIGINS = [
     "https://event-scheduler-backend-production.up.railway.app",  # ymy railway
     "http://localhost:8000",  # for local testing
 ]
+CORS_ALLOW_ALL_ORIGINS = True
+
+
 ROOT_URLCONF = 'event_scheduler.urls'
 
 TEMPLATES = [

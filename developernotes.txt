@@ -51,3 +51,9 @@
   history_id   | A globally unique ID that increases with each historical change
 
 - You can retrieve version history, compare diffs, and rollback to previous versions using history_id.
+
+5. Custom Event History API ( I added it additionally)
+
+- A custom API has been created to fetch the version history for a specific event.
+- This API returns a list of history IDs along with their corresponding version timestamps.
+- It is useful for identifying previous versions when performing rollback operations

@@ -30,3 +30,4 @@ traitlets==5.14.3
 typing_extensions==4.13.2
 uritemplate==4.1.1
 wcwidth==0.2.13
+whitenoise==6.9.0

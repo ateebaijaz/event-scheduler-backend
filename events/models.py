@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.cache import cache
 
 # Create your models here.
 # events/models.py
@@ -27,6 +28,20 @@ class Event(models.Model):
 
     def __str__(self):
         return f"{self.title}-{self.location}"
+    
+    def clear_cache(self):
+        # Invalidate cache for all users who participated in this event
+        for user in self.participants.all():
+            cache_key = f"event_detail_view_{self.id}_user_{user.id}"
+            cache.delete(cache_key)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.clear_cache()
+
+    def delete(self, *args, **kwargs):
+        self.clear_cache()
+        super().delete(*args, **kwargs)
 
 
 class EventParticipant(models.Model):
@@ -45,5 +60,14 @@ class EventParticipant(models.Model):
 
     def __str__(self):
         return f"{self.user.username} ({self.role}) in {self.event.title}"
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        cache.delete(f"event_participants_{self.event_id}")
+
+    def delete(self, *args, **kwargs):
+        event_id = self.event_id
+        super().delete(*args, **kwargs)
+        cache.delete(f"event_participants_{event_id}")
 
 

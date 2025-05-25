@@ -15,5 +15,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
+class CustomTokenRefreshRequestSerializer(serializers.Serializer):
+    refresh = serializers.CharField()
 
-
+    class Meta:
+        ref_name = "CustomTokenRefreshRequestSerializer"

@@ -6,10 +6,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from users.serializers import RegisterSerializer, LoginSerializer
 from django.contrib.auth.models import User
 from rest_framework.permissions import AllowAny
-
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import serializers
+from users.serializers import CustomTokenRefreshRequestSerializer
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    @swagger_auto_schema(request_body=RegisterSerializer)
     def post(self, request):
         print("myrequestttt", request.data)
         serializer = RegisterSerializer(data=request.data)
@@ -25,6 +28,7 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    @swagger_auto_schema(request_body=LoginSerializer)
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
@@ -44,11 +48,13 @@ class LoginView(APIView):
 
 class LogoutView(APIView):
     permission_classes = [AllowAny]
+    @swagger_auto_schema(request_body=CustomTokenRefreshRequestSerializer)
     def post(self, request):
         try:
             refresh_token = request.data["refresh"]
             token = RefreshToken(refresh_token)
             token.blacklist()
             return Response(status=status.HTTP_205_RESET_CONTENT)
-        except Exception:
+        except Exception as e:
+            print("Error during logout:", e)
             return Response(status=status.HTTP_400_BAD_REQUEST)

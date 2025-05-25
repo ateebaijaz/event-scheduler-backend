@@ -1,0 +1,53 @@
+## Developer Notes: Event Scheduling API
+
+1. Authentication & Token Handling
+
+- The system provides a Register API and a Login API to authenticate users.
+
+- Register API:
+  - Requires: username, password, email
+  - Response: access token and refresh token
+
+- Login API:
+  - Requires: username, password
+  - Response: access token and refresh token (same format as register)
+
+- Usage:
+  - For all authenticated requests, add the following header:
+    Authorization: Bearer <access_token>
+
+2. Bulk Event Creation (No Conflict Detection)
+
+- Bulk creation uses Django’s bulk_create() for efficiency.
+- All event objects are prepared in memory and inserted in one DB call.
+- This avoids multiple DB connections in a loop.
+
+- Trade-off:
+  - Conflict detection is not available for bulk creation
+  - Since objects are not saved individually, they can’t be validated one by one
+
+3. Optional: Extend Access Token Lifetime (Dev/Testing Only)
+
+- You can increase the access token lifetime in `settings.py` to avoid frequent refreshes:
+
+  Example:
+  from datetime import timedelta
+
+  SIMPLE_JWT = {
+      "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
+      # other settings...
+  }
+
+4. Event History & Versioning
+
+- The app uses django-simple-history to keep track of event versions.
+- Each time an event is updated, a new historical version is stored.
+
+- Key difference between id and history_id:
+
+  Field        | Description
+  -------------|-------------------------------------------------------------
+  id           | The original primary key of the event (remains constant)
+  history_id   | A globally unique ID that increases with each historical change
+
+- You can retrieve version history, compare diffs, and rollback to previous versions using history_id.

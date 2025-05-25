@@ -64,6 +64,7 @@ SIMPLE_JWT = {
 }
 
 SWAGGER_SETTINGS = {
+    'USE_SESSION_AUTH': False,  # Disable Django login
     'SECURITY_DEFINITIONS': {
         'Bearer': {
             'type': 'apiKey',
